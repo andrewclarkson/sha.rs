@@ -1,4 +1,7 @@
+#![feature(asm)]
 #![crate_id="sha"]
+
+use std::slice::bytes::copy_memory;
 
 static MAGIC_VALUES_SHA256: [u32, ..8] = [
     0x6a09e667,
@@ -30,16 +33,97 @@ static ROUND_CONSTANTS: [u32, ..64] = [
     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 ];
 
-struct Sha256<'a> {
-    state: &'a [u32, ..8],
+pub struct Sha256<'a> {
+    state: &'a [u32],
+    position: uint,
     buffer: Vec<u8>
 }
 
 impl<'a> Sha256<'a> {
-    fn new() -> Sha256<'a> {
+    pub fn new() -> Sha256<'a> {
+        let mut buffer = Vec::with_capacity(64);
+        unsafe { buffer.set_len(64); }
         Sha256 {
             state: MAGIC_VALUES_SHA256.clone(),
-            buffer: Vec::with_capacity(512)
+            buffer: buffer,
+            position: 0,
+        }
+    }
+
+    //
+    // Adds the message to the buffer and hashes when the 
+    // buffer is full
+    // TODO: refactor
+    //
+    pub fn update(&mut self, message: &[u8]) {
+        
+        let mut position: uint = 0;
+
+        if self.position > 0 {
+            let space = 64 - self.position;
+            if space > message.len() {
+                {
+                    let destination = self.buffer.mut_slice_from(self.position);
+                    copy_memory(destination, message);
+                }
+                self.position += message.len();
+                return;
+            } else if space == message.len() {
+                {
+                    let destination = self.buffer.mut_slice_from(self.position);
+                    copy_memory(destination, message);
+                }
+                self.hash();
+                return; 
+            } else {
+                {
+                    let destination = self.buffer.mut_slice_from(self.position);
+                    let source = message.slice_to(space);
+                    copy_memory(destination, source);
+                }
+                self.hash();
+                position += space;
+            }
+        }
+
+
+        while position < message.len() {
+            let end = position + 64;
+            if end <= message.len() {
+                {
+                    let destination = self.buffer.as_mut_slice();
+                    let source = message.slice(position, end);
+                    copy_memory(destination, source);
+                }
+                self.hash();
+                position = end;
+            
+            // final iteration
+            } else {
+                {
+                    let destination = self.buffer.as_mut_slice();
+                    let source = message.slice_from(position);
+                    copy_memory(destination, source);
+                }
+                self.position = message.len() - position;
+                break;
+            }
+        } 
+
+    }
+
+    fn hash(&mut self) {
+        //TODO: inline assembly?
+        //
+
+        let mut first: u32;
+        unsafe {
+            asm!(
+                "movl $a, $b"
+                :"=r"(first)
+                :"a"(self.state),
+                :
+            )
         }
     }
 
@@ -47,12 +131,37 @@ impl<'a> Sha256<'a> {
 
 #[cfg(test)]
 mod test {
-
+    #![feature(phase)]
+    
     use super::Sha256;
+    use std::string::String;
+    
+    macro_rules! rotate_right_32 (
+        ($value:expr, $shift:expr) => (
+            ($value >> $shift) | ($value << (32 - $shift))
+        )
+    )
 
     #[test] 
     fn test_sha256() {
-        let hasher = Sha256::new();
+        let mut hasher = Sha256::new();
+        let message = String::from_str("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ");
+
+        hasher.update(message.as_bytes());
+        
+        assert!(hasher.position == 63 && message.len() == 63);
+        hasher.update("a".as_bytes());
+        assert!(hasher.position == 0);
+    }
+
+    #[test]
+    fn test_right_rotate() {
+        let five: u32 = 5;
+
+        let shifted: u32 = 2147483650;
+
+        assert_eq!(shifted, rotate_right_32!(five, 1));
+
     }
 }
 
