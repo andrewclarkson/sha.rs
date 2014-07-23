@@ -112,21 +112,117 @@ impl<'a> Sha256<'a> {
 
     }
 
-    fn hash(&mut self) {
-        //TODO: inline assembly?
-        //
 
-        let mut first: u32;
+    #[cfg(target_arch = "x86_64")]
+    fn hash(chunk: &Vec<u8>, state: &Vec<u32>) {
+
+        let mut schedule: Vec<u32> = Vec::with_capacity(64);
+
+        unsafe {
+            schedule.set_len(64);
+        
+        }
+        let mut ptr = schedule.as_mut_ptr();
         unsafe {
             asm!(
-                "movl $a, $b"
-                :"=r"(first)
-                :"a"(self.state),
-                :
-            )
+                // Move chunk into schedule array
+                "
+                movq ($1), %rax
+                movq 8($1), %rcx
+                movq %rax, ($0)
+                movq %rcx, 8($0)
+                
+                movq 16($1), %rax
+                movq 24($1), %rcx
+                movq %rax, 16($0)
+                movq %rcx, 24($0)
+                
+                movq 32($1), %rax
+                movq 40($1), %rcx
+                movq %rax, 32($0)
+                movq %rcx, 40($0)
+                
+                movq 48($1), %rax
+                movq 56($1), %rcx
+                movq %rax, 48($0)
+                movq %rcx, 56($0)
+                "    
+                :"+r"(ptr)
+                :"r"(chunk.as_ptr())
+                : "rax", "rcx"
+            );
+
         }
+        
+        println!("{}", schedule[0]);
+        println!("{}", schedule[1]);
+        println!("{}", schedule[2]);
+        println!("{}", schedule[3]);
+        println!("{}", schedule[4]);
+        println!("{}", schedule[5]);
     }
 
+    #[cfg(target_arch = "x86")]
+    fn hash(chunk: &Vec<u8>, state: &Vec<u32>) {
+
+        let mut schedule: Vec<u32> = Vec::with_capacity(64);
+
+        unsafe {
+            schedule.set_len(64);
+        
+        }
+        let mut ptr = schedule.as_mut_ptr();
+        unsafe {
+            asm!(
+                // Move chunk into schedule array
+                "
+                movl ($1), %eax
+                movl 4($1), %ecx
+                movl %eax, ($0)
+                movl %ecx, 4($0)
+                
+                movl 8($1), %eax
+                movl 12($1), %ecx
+                movl %eax, 8($0)
+                movl %ecx, 12($0)
+                
+                movl 16($1), %eax
+                movl 20($1), %ecx
+                movl %eax, 16($0)
+                movl %ecx, 20($0)
+                
+                movl 24($1), %eax
+                movl 28($1), %ecx
+                movl %eax, 24($0)
+                movl %ecx, 28($0)
+                
+                movl 32($1), %eax
+                movl 36($1), %ecx
+                movl %eax, 32($0)
+                movl %ecx, 36($0)
+                
+                movl 40($1), %eax
+                movl 44($1), %ecx
+                movl %eax, 40($0)
+                movl %ecx, 44($0)
+                
+                movl 48($1), %eax
+                movl 52($1), %ecx
+                movl %eax, 48($0)
+                movl %ecx, 52($0)
+                
+                movl 56($1), %eax
+                movl 60($1), %ecx
+                movl %eax, 56($0)
+                movl %ecx, 60($0)
+                "    
+                :"+r"(ptr)
+                :"r"(chunk.as_ptr())
+                : "eax", "ecx"
+            );
+
+        }
+    }
 }
 
 #[cfg(test)]
