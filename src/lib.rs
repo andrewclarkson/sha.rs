@@ -154,12 +154,6 @@ impl<'a> Sha256<'a> {
 
         }
         
-        println!("{}", schedule[0]);
-        println!("{}", schedule[1]);
-        println!("{}", schedule[2]);
-        println!("{}", schedule[3]);
-        println!("{}", schedule[4]);
-        println!("{}", schedule[5]);
     }
 
     #[cfg(target_arch = "x86")]
